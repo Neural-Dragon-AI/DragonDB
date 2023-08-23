@@ -1,31 +1,24 @@
 import psycopg2 # pyright: ignore
-import io
 from babydragon.memory.threads.base_thread import BaseThread
-from pydantic_core.core_schema import ExpectedSerializationTypes
-
-
-memory = BaseThread()
-memory.load('./parquets/base_test')
-data = memory.memory_thread.to_struct('data')
-tuples = [(d['role'], d['content'], d['timestamp'], d['tokens_count']) for d in data]
-""" print(tuples) """
 
 
 
 
 
-try:
-    conn = psycopg2.connect(database="postgres",
-                            host="db.nleiqequaduxvlmiitkk.supabase.co",
-                            user="postgres",
-                            password="Orsopolare091",
-                            port="5432")
-except Exception as e:
-    print(e)
-    conn = None
+def connect_to_supabase():
+    try:
+        return psycopg2.connect(database="postgres",
+                                host="db.nleiqequaduxvlmiitkk.supabase.co",
+                                user="postgres",
+                                password="Orsopolare091",
+                                port="5432")
+    except Exception as e:
+        print(e)
+        return None
 
 
-def create_conversation(conn, cur, nome):
+def create_conversation(conn, nome):
+    cur = conn.cursor()
     try:
         create_table_query = f"""
         CREATE TABLE conversations.{nome} (
@@ -45,11 +38,12 @@ def create_conversation(conn, cur, nome):
         conn.rollback()
 
 
-def bulk_insert(conn,cur,nome, tuples):
+def bulk_insert(conn,nome, tuples):
+    cur = conn.cursor()
     try:
-        cur = conn.cursor()
         query = f"INSERT INTO conversations.{nome} (role, content, timestamp, tokens_count) VALUES (%s, %s, %s, %s)"
         cur.executemany(query, tuples)
+        print(f"Bulked in all data in {nome}")
         conn.commit()
         cur.close()
     except Exception as e:
@@ -58,10 +52,12 @@ def bulk_insert(conn,cur,nome, tuples):
         conn.rollback()
 
 
-if conn is not None:
-    
-    create_conversation(conn, conn.cursor(), 'conversazione3')
-    bulk_insert(conn, conn.cursor(), 'conversazione3', tuples)
+def create_conversation_data(url):
+    memory = BaseThread()
+    memory.load_from_gpt_url(url)
+    data = memory.memory_thread.to_struct('data')
+    tuples = [(d['role'], d['content'], d['timestamp'], d['tokens_count']) for d in data]
+    return tuples
 
 
 

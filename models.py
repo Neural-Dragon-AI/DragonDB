@@ -1,6 +1,5 @@
-
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Union
 
 class IndexFlagPair(BaseModel):
     index: int
@@ -44,6 +43,14 @@ class ChatBackUp(BaseModel):
     conversation: list[Message]
     config: ChatApi
 
+class Node(BaseModel):
+    name: str
+    type: str
+    childrens: List[Union["Node", None]] = []
+
+
+class Stash(BaseModel):
+    stash: List[Node]
 
 
 

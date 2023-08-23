@@ -1,13 +1,12 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from active_instances import *
-from api_types import  ChatBackUp, ChatApi, Message
+from models import  ChatBackUp, ChatApi, Message
 from configBabyDragon import *
 import json
 import pkg_resources
 from fastapi.responses import StreamingResponse
-from function_call import *
-from function_call import welcome_openai_function
+
 from babydragon.utils.chatml import mark_answer
 
 app = FastAPI()

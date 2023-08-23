@@ -15,7 +15,7 @@ import json
 
 
 
-async def new_PythonIndexesBabydragon(model: str, instance_key: Union[str,None], key: str, config:str):
+async def new_PythonIndexesBabydragon( instance_key: Union[str,None], key: str, config:str):
     
     config = json.loads(config)
     if instance_key in instances.keys():

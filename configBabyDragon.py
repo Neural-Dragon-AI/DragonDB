@@ -1,7 +1,7 @@
 from typing import  Union, cast
 
 from babydragon.chat.memory_chat import Chat, FifoChat, VectorChat, FifoVectorChat
-from api_types import  ChatApi
+from models import  ChatApi
 import openai
 from active_instances import *
 from index_manager import *
@@ -25,8 +25,7 @@ def generate_instance_key(api_key: str) -> bytes:
 
 async def create_Chat(instance_key: str, api_key: str, chatType: str, config:ChatApi ) -> str:
     
-    if instance_key.encode("utf-8") in instances.keys():
-        
+    if instance_key.encode("utf-8") in instances.keys():        
         return instance_key
     try:
         openai.api_key = api_key
