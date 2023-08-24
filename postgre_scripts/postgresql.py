@@ -1,10 +1,6 @@
 import psycopg2 # pyright: ignore
 from babydragon.memory.threads.base_thread import BaseThread
 
-
-
-
-
 def connect_to_supabase():
     try:
         return psycopg2.connect(database="postgres",

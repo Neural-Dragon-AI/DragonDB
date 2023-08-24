@@ -29,15 +29,15 @@ example_data = [
                 "name": "Categoria 1",
                 "type": "folder",
                 "childrens": [
-                    {"name": "Conversazione 1", "type": "file"},
-                    {"name": "Conversazione 2", "type": "file"}
+                    {"name": "Conversazione 1", "type": "file" ,"id":"1"},
+                    {"name": "Conversazione 2", "type": "file","id": "2"}
                 ]
             },
-            {"name": "Conversazione 3", "type": "file"},
-            {"name": "Conversazione 4", "type": "file"}
+            {"name": "Conversazione 3", "type": "file", "id": "3"},
+            {"name": "Conversazione 4", "type": "file", "id": "4"}
         ]
     },
-    {"name": "Conversazione 0", "type": "file"}
+    {"name": "Conversazione 0", "type": "file", "id": "0"}
 ]
 
 def create_stash(description):
@@ -76,7 +76,9 @@ def create_stash(description):
 
 
 
-output = create_stash("A simple stash containing 2 wmpty folders")
+output = create_stash("A  stash containing 4 folders for each season, each one should \
+contain a subfolder for each month of the season\
+The subfolders should contain 2 files")
 print(output)
 
 

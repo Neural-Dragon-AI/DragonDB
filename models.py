@@ -46,6 +46,7 @@ class ChatBackUp(BaseModel):
 class Node(BaseModel):
     name: str
     type: str
+    id: str
     childrens: List[Union["Node", None]] = []
 
 
