@@ -47,6 +47,7 @@ class Node(BaseModel):
     name: str
     type: str
     id: str
+    tags: str
     childrens: List[Union["Node", None]] = []
 
 
@@ -54,4 +55,5 @@ class Stash(BaseModel):
     stash: List[Node]
 
 
-
+class Url(BaseModel):
+    url: str

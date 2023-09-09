@@ -1,18 +1,18 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from active_instances import *
-from models import  ChatBackUp, ChatApi, Message
-from configBabyDragon import *
+from models import  ChatBackUp, ChatApi, Message, Url
+""" from configBabyDragon import * """
 import json
 import pkg_resources
 from fastapi.responses import StreamingResponse
-
+from babydragon.memory.threads.base_thread import BaseThread
 from babydragon.utils.chatml import mark_answer
 
 app = FastAPI()
 
 origins = [
-    "localhost:5173",
+    "localhost:3000",
 ]
 
 app = FastAPI()
@@ -25,6 +25,38 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+
+
+@app.post("/importFromUrl")
+async def append_user_defined_ids(body: Url):
+    try:
+        new_thread = BaseThread()
+        new_thread.load_from_gpt_url(body.url)
+        print(new_thread.memory_thread) 
+
+        return {"status":"correct"  } 
+   
+    except Exception as e: 
+        print(e) 
+        return {"status":"error", "current_user_defined_ids": str(e)} 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+""" OLD CALLS I KEEP THEM HERE FOR MEMO """
 
 @app.post("/getnewbabydragon/{chatType}/{apikey}/{instance_key}")
 async def get_new_Chat(instance_key: str, chatType:str, apikey: str, body: ChatApi):
@@ -39,17 +71,6 @@ async def get_new_Chat(instance_key: str, chatType:str, apikey: str, body: ChatA
         print("Request body: ", body.dict())
         print("Error: ", e)
         return {"status":"failed", "instance_key": str(e), "index_dict": {}}
-
-@app.get("/welcome")
-async def welcome():
-    try:
-        welcome_openai_function()
-        
-
-    except Exception as e:
-        print(str(e))
-
-
 
 
 @app.get("/getvenvmodules")
@@ -76,22 +97,6 @@ async def updatebackup(instance_key: str, chat_backup: ChatBackUp):
 
 
 
-@app.post("/append_user_defined_ids/{key}/{index}")
-async def append_user_defined_ids(key: str, index:str, data: List[int]):
-    
-    try: 
-        chatbot = instances[key.encode('utf-8')] 
-        chatbot.add_user_defined_ids({index: data}) 
-        current_user_defined_ids = chatbot.user_defined_ids
-        print(current_user_defined_ids)
-        instances[key.encode('utf-8')] = chatbot 
-    
-
-        return {"status":"correct" , "current_user_defined_ids": current_user_defined_ids } 
-   
-    except Exception as e: 
-        print(e) 
-        return {"status":"error", "current_user_defined_ids": str(e)} 
 
 @app.delete("/deletebabydragon/{instance_key}")
 async def delete_Chat(instance_key: str):
@@ -172,9 +177,6 @@ async def set_current_index(key: str, index: str):
     except Exception as e:
         print(e)
         return {"status":"error", "new_index": str(e)}
-
-
-
 
 
 
