@@ -47,12 +47,12 @@ class Node(BaseModel):
     name: str
     type: str
     id: str
-    tags: str
+    tags: Union[str,None] = ""
     childrens: List[Union["Node", None]] = []
 
 
 class Stash(BaseModel):
-    stash: List[Node]
+    stash_mapping: list
 
 
 class Url(BaseModel):

@@ -1,13 +1,16 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from active_instances import *
-from models import  ChatBackUp, ChatApi, Message, Url
+from models import  ChatBackUp, ChatApi, Message, Url, Stash
 """ from configBabyDragon import * """
+from pathlib import Path
 import json
+import zipfile
 import pkg_resources
 from fastapi.responses import StreamingResponse
 from babydragon.memory.threads.base_thread import BaseThread
 from babydragon.utils.chatml import mark_answer
+import polars as pl
 
 app = FastAPI()
 
@@ -27,25 +30,147 @@ app.add_middleware(
 
 
 
+@app.get("/getRows/{user_id}/{conversation_id}")
+async def get_rows(user_id: str, conversation_id: str):
 
-@app.post("/importFromUrl")
-async def append_user_defined_ids(body: Url):
     try:
-        new_thread = BaseThread()
-        new_thread.load_from_gpt_url(body.url)
-        print(new_thread.memory_thread) 
-
-        return {"status":"correct"  } 
+        
+        user_thread = BaseThread()
+        user_thread.load(f'users/{user_id}/memory.parquet')
+        response = user_thread.memory_thread.lazy().filter(pl.col("conversation_id") == conversation_id).collect().to_dicts()
+        print(len(response))
+        return response
    
     except Exception as e: 
         print(e) 
-        return {"status":"error", "current_user_defined_ids": str(e)} 
+        return {"status":"error",  "error":str(e)} 
 
 
 
 
+@app.post("/importFromUrl/{user_id}")
+async def append_user_defined_ids(body: Url, user_id: str):
+    print(body.url)
+    try:
+        
+        new_thread = BaseThread(save_path=f'users/{user_id}/')
+        new_thread.load_from_gpt_url(body.url)
+        print(new_thread.memory_thread[0]['conversation_id'][0])
+        new_thread.save()
+
+        return {"id":new_thread.memory_thread[0]['conversation_id'][0], "name":new_thread.memory_thread[0]['conversation_title'][0]}
+   
+    except Exception as e: 
+        print(e) 
+        return {"status":"error",  "error":str(e)} 
 
 
+@app.get("/stashMapping/{user_id}")
+async def chatbot_reply(user_id: str):
+    try:
+
+        file_path = Path(f"./users/{user_id}/stash_mapping.json")
+        
+
+        if not file_path.is_file():
+            raise HTTPException(status_code=404, detail="User ID not found")
+        
+
+        with open(file_path, "r") as f:
+            data = json.load(f)
+
+        return data
+    
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+
+@app.put("/stashMapping/{user_id}")
+async def update_stash_mapping(user_id: str, body: Stash):
+    print(body.stash_mapping)
+    try:
+        # Costruisce il percorso del file JSON
+        file_path = Path(f"./users/{user_id}/stash_mapping.json")
+
+        # Controlla se il file esiste
+        if not file_path.is_file():
+            raise HTTPException(status_code=404, detail="User ID not found")
+        """ print(json.dumps(body.stash_mapping)) """
+        # Sovrascrive il file con il nuovo contenuto
+        with open(file_path, "w") as f:
+            json.dump(body.stash_mapping, f)
+
+        return {"status": "success", "message": "File content updated"}
+
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+
+
+
+
+@app.delete("/stashMapping/{user_id}")
+async def delete_stash_mapping(user_id: str):
+    try:
+
+        file_path = Path(f"./users/{user_id}/stash_mapping.json")
+        
+        if not file_path.is_file():
+            raise HTTPException(status_code=404, detail="User ID not found")
+        
+        with open(file_path, "w") as f:
+            f.write("[]")
+        
+        return {"status": "success", "message": "File content deleted"}
+    
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+
+
+@app.post("/uploadfile/{user_id}")
+async def upload_file(user_id: str, file: UploadFile = File(...) ):
+
+    file_ext = ''
+    print(file.filename)
+    if file.filename is not None:
+        file_ext = file.filename.split('.')[-1]  # Ottieni l'estensione del file
+
+    if file_ext == 'zip':
+        # Processa il file ZIP
+        try:
+            with zipfile.ZipFile(file.file) as z:
+                # Elenco dei file all'interno del file ZIP
+                list_of_file_names = z.namelist()
+
+                # Stampa il contenuto di ciascun file
+                """ for file_name in list_of_file_names: """
+                """     with z.open(file_name) as f: """
+                """         file_content = f.read() """
+                """         print(f"Contenuto del file {file_name}: {file_content}") """
+        
+        except zipfile.BadZipFile:
+            raise HTTPException(status_code=400, detail="Bad ZIP file")
+        
+        return {"status": "success", "message": "File ZIP processato correttamente"}
+
+    elif file_ext == 'json':
+        # Processa il file JSON
+        try:
+            json_content = json.load(file.file)
+            thread = BaseThread()
+            thread.load_from_backup(json_content)
+            thread.save(f'users/{user_id}/memory.parquet')
+            new_mappings = thread.memory_thread.select("conversation_id","conversation_title").unique().to_dicts()
+            """ print(f"Contenuto del file JSON: {json_content}") """
+
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Bad JSON file")
+        
+        return {"status": "success", "content": new_mappings}
+
+    else:
+        raise HTTPException(status_code=400, detail="Tipo di file non supportato")
 
 
 
@@ -110,20 +235,7 @@ async def delete_Chat(instance_key: str):
         return {"status":"failed", "message": f"No instance with key {instance_key} found."}
 
 
-@app.get("/reply/{key}/{question}")
-async def chatbot_reply(key: str, question: str):
-        
-    try:
-        reply = instances[key.encode('utf-8')].reply(question)  
-        return {"status":"correct" , "reply": reply}
 
-    except Exception as e:
-        print(e)
-        if "KeyError" in str(type(e)):
-            error = "Sorry, your chatbot no longer exists in the backend :( Restore the conversation from the backup file! "
-        else:
-            error = str(e)
-        return {"status":"error", "reply": error}
   
 @app.get("/streamreply/{key}/{question}")
 async def stream_reply(key: str, question: str):
