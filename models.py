@@ -57,3 +57,9 @@ class Stash(BaseModel):
 
 class Url(BaseModel):
     url: str
+
+
+class EmbeddingsFinalize(BaseModel):
+    openai_api_key: str
+    name: str
+

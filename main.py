@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from active_instances import *
-from models import  ChatBackUp, ChatApi, Message, Url, Stash
+from models import  *
 """ from configBabyDragon import * """
 from pathlib import Path
 import json
@@ -10,6 +10,7 @@ import pkg_resources
 from fastapi.responses import StreamingResponse
 from babydragon.memory.threads.base_thread import BaseThread
 from babydragon.utils.chatml import mark_answer
+from pipelines.jobs import EmbeddingsPipeline
 import polars as pl
 
 app = FastAPI()
@@ -44,6 +45,79 @@ async def get_rows(user_id: str, conversation_id: str):
     except Exception as e: 
         print(e) 
         return {"status":"error",  "error":str(e)} 
+
+
+@app.get("/getInfo/{user_id}/")
+async def get_Info(user_id: str):
+
+    try:
+        
+        user_thread = BaseThread()
+        user_thread.load(f'users/{user_id}/memory.parquet')
+        num_messages = user_thread.memory_thread.shape[0]
+        num_conversations = user_thread.memory_thread.select("conversation_id").unique().shape[0]
+        info = {"num_messages":num_messages, "num_conversations": num_conversations}
+        return info
+   
+    except Exception as e: 
+        print(e) 
+        return {"status":"error",  "error":str(e)} 
+
+
+@app.post("/embeddingsRequest/{user_id}")
+async def embeddingsRequest(user_id: str):
+
+    try:
+        user_thread = BaseThread()
+        user_thread.load(f'users/{user_id}/memory.parquet')
+        pipeline = EmbeddingsPipeline(raw_thread=user_thread.memory_thread)
+
+        return {
+                "status":"success",
+                "name":pipeline.generator.name,
+                "total_token":pipeline.generator.total_tokens,
+                "total_estimated_cost":pipeline.generator.total_estimated_cost
+                }
+   
+    except Exception as e: 
+        print(e) 
+        return {"status":"error",  "error":str(e)} 
+
+
+
+@app.post("/embeddingsFinalize/{user_id}")
+async def embeddingsFinalize(body:EmbeddingsFinalize, user_id: str):
+    try:
+
+        user_thread = BaseThread()
+        user_thread.load(f'users/{user_id}/memory.parquet')
+        new_pipeline = EmbeddingsPipeline(restore=body.name,raw_thread=user_thread.memory_thread, open_api_api_key=body.openai_api_key) 
+        output = new_pipeline.start()
+
+        if output is not None:
+
+            merged_data = user_thread.memory_thread.with_row_count('id')\
+                                                    .join(output.with_columns(pl.col('id')\
+                                                    .cast(pl.UInt32)).select('output','id')\
+                                                    .sort('id'), on="id")\
+                                                    .rename({"output":f'embeddings_{new_pipeline.generator.name}'})\
+                                                    .drop('id')
+
+            user_thread.memory_thread = merged_data
+            user_thread.save(f'users/{user_id}/memory.parquet')
+            return { "status":"success", "new_column": f'embeddings_{new_pipeline.generator.name}' }
+
+        else:
+            return {"status":"error",  "error":"No embeddings job output find."}
+
+
+
+            
+    except Exception as e: 
+        print(e) 
+        return {"status":"error",  "error":str(e)} 
+
+
 
 
 
@@ -120,6 +194,12 @@ async def delete_stash_mapping(user_id: str):
         
         with open(file_path, "w") as f:
             f.write("[]")
+
+
+        user_thread = BaseThread()
+        user_thread.load(f'users/{user_id}/memory.parquet')
+        user_thread.memory_thread = pl.DataFrame(schema=user_thread.memory_schema)
+        user_thread.save(f'users/{user_id}/memory.parquet')
         
         return {"status": "success", "message": "File content deleted"}
     
@@ -171,6 +251,14 @@ async def upload_file(user_id: str, file: UploadFile = File(...) ):
 
     else:
         raise HTTPException(status_code=400, detail="Tipo di file non supportato")
+
+
+
+
+
+
+
+
 
 
 
